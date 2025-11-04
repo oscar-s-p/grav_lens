@@ -3,8 +3,14 @@
 venv/
 venv.bak/
 
+# Obsidian notebook
+Libreta
+
 # FITS images
 *.fits
+
+# Pandas dataframes
+*.pkl
 
 # Standards
 
