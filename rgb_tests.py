@@ -11,7 +11,7 @@ def manual_norm(data, min, max):
     d[d_mask] = 0
     return d
 
-iv = image_viewer('test_images', folder_list=['2025-11-09'], list_available=False)
+iv = image_viewer('test_images', folder_list=['2025-11-11'], list_available=False)
 obj = iv.df_files['object'].loc[0]
 obj_int = iv.df_grav_lens.index[iv.df_grav_lens['object'] == obj].tolist()[0]
 obj = iv.df_grav_lens['object'].loc[obj_int]
@@ -32,7 +32,7 @@ d_cut = []
 for i in range(3):
     im_str, im = iv.return_index(i)
     d_cut = iv.data_manipulation(im_str, centered = (ra, dec),
-                                 zoom = False)[0]
+                                 zoom = '0 3 1 d')[0]
                                 #  zoom = '0 3 0 d')[0]
     data[i] = d_cut.data
     if i==0:
@@ -49,9 +49,11 @@ for i in range(3):
     manual_min = sky_flux[i]
     manual_max = sky_flux[i]*1.1
     print(manual_min, manual_max)
-    d_norm.append((data[i] - manual_min)/(manual_max - manual_min))
-    min_mask = d_norm[i] < 0.01
-    d_norm[i][min_mask] = 0.01
+    d_norm.append(manual_norm(data[i], manual_min, manual_max))
+
+    # d_norm.append((data[i] - manual_min)/(manual_max - manual_min))
+    # min_mask = d_norm[i] < 0.01
+    # d_norm[i][min_mask] = 0.01
 
 #     ax[j].imshow(data[i], origin = 'lower')
 #     ax[j].set_title(str(iv.df_files['filter'].loc[i]))
@@ -64,10 +66,10 @@ for i in range(3):
 # plt.show()
 
 
-# rgb = astropy.visualization.make_lupton_rgb(d_norm[2], d_norm[1], d_norm[0],
-#                                             stretch = 1,
-#                                             Q = 8)
+rgb = astropy.visualization.make_lupton_rgb(d_norm[2], d_norm[1], d_norm[0],
+                                            stretch = 1,
+                                            Q = 8)
 
-# ax[-1].imshow(rgb, origin = 'lower')
+ax[-1].imshow(rgb, origin = 'lower')
 plt.tight_layout()
 plt.show()
