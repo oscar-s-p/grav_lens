@@ -11,7 +11,7 @@ def manual_norm(data, min, max):
     d[d_mask] = 0
     return d
 
-iv = image_viewer('test_images', folder_list=['2025-11-07'], list_available=False)
+iv = image_viewer('test_images', folder_list=['2025-11-09'], list_available=False)
 obj = iv.df_files['object'].loc[0]
 obj_int = iv.df_grav_lens.index[iv.df_grav_lens['object'] == obj].tolist()[0]
 obj = iv.df_grav_lens['object'].loc[obj_int]
@@ -32,7 +32,8 @@ d_cut = []
 for i in range(3):
     im_str, im = iv.return_index(i)
     d_cut = iv.data_manipulation(im_str, centered = (ra, dec),
-                                 zoom = '0 3 0 d')[0]
+                                 zoom = False)[0]
+                                #  zoom = '0 3 0 d')[0]
     data[i] = d_cut.data
     if i==0:
         fig, ax = plt.subplots(2,2, figsize = (14,8), subplot_kw=dict(projection=d_cut.wcs))
@@ -63,10 +64,10 @@ for i in range(3):
 # plt.show()
 
 
-rgb = astropy.visualization.make_lupton_rgb(d_norm[2], d_norm[1], d_norm[0],
-                                            stretch = 1,
-                                            Q = 8)
+# rgb = astropy.visualization.make_lupton_rgb(d_norm[2], d_norm[1], d_norm[0],
+#                                             stretch = 1,
+#                                             Q = 8)
 
-ax[-1].imshow(rgb, origin = 'lower')
+# ax[-1].imshow(rgb, origin = 'lower')
 plt.tight_layout()
 plt.show()
