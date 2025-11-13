@@ -30,15 +30,13 @@ d_cut = []
 
 
 for i in range(3):
-    im_str, im = iv.return_index(i)
-    d_cut = iv.data_manipulation(im_str, centered = (ra, dec),
-                                 zoom = '0 3 1 d')[0]
-                                #  zoom = '0 3 0 d')[0]
+    im_str, im = iv.return_index(i) # type: ignore
+    d_cut = iv.data_manipulation(im_str, centered = (ra, dec), # type: ignore
+                                 zoom = '0 3 1 d')[0] # type: ignore
     data[i] = d_cut.data
     if i==0:
         fig, ax = plt.subplots(2,2, figsize = (14,8), subplot_kw=dict(projection=d_cut.wcs))
         ax = ax.ravel()
-    # print(np.mean(data[i]), sky_flux[i])
     j = 3*i
     norm_i = astropy.visualization.simple_norm(data[i],
                                                stretch = 'linear',
@@ -51,19 +49,9 @@ for i in range(3):
     print(manual_min, manual_max)
     d_norm.append(manual_norm(data[i], manual_min, manual_max))
 
-    # d_norm.append((data[i] - manual_min)/(manual_max - manual_min))
-    # min_mask = d_norm[i] < 0.01
-    # d_norm[i][min_mask] = 0.01
-
-#     ax[j].imshow(data[i], origin = 'lower')
-#     ax[j].set_title(str(iv.df_files['filter'].loc[i]))
-#     ax[j+1].imshow(norm_i(data[i]), origin = 'lower')
-#     ax[j+1].set_title(' NORM ' + str(sky_flux[i]))
     ax[i].imshow(d_norm[i], origin = 'lower')
     ax[i].set_title(str(iv.df_files['filter'].loc[i]) + str(sky_flux[i]))
 
-# plt.tight_layout()
-# plt.show()
 
 
 rgb = astropy.visualization.make_lupton_rgb(d_norm[2], d_norm[1], d_norm[0],

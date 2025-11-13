@@ -32,7 +32,7 @@ from math import ceil
 class image_viewer:
     def __init__(self, directory: str = '',
                list_available = False,
-               folder_list = False,
+               folder_list = [],
                previous_df = False,
                print_error = True):
         """Class to quickly open FITS images. Searches in given directory.
@@ -81,7 +81,7 @@ class image_viewer:
         files = list(Path(self.dir_img).glob('*.fits'))
         folder_found = ['']*len(files)
         # list of images in the different folders of folder_list and the corresponding folder
-        if folder_list!= False:
+        if folder_list!= []:
             for fl in folder_list:
                 fi = list(Path(os.path.join(self.dir_img, fl)).glob('*.fits'))
                 files=files+fi
@@ -164,7 +164,7 @@ class image_viewer:
                 return
         if self.folder_list != False:
             folder_name = self.df_files.iloc[image_int].folder_found
-            image_str = os.path.join(folder_name, image_str)
+            image_str = os.path.join(folder_name, image_str) # type: ignore
         return image_str, image_int
     
 
@@ -201,7 +201,6 @@ class image_viewer:
             print('ERROR: No previously known object was found.\n  Try with one of: ', self.df_grav_lens['object'].tolist())
         
         df_filtered = self.df_files[self.df_files["object"]==obj_str].copy()
-        # df_filtered['day'] = df_filtered['date_time'].dt.date
 
         if date == None:
             print('Available date observations:')
@@ -212,9 +211,6 @@ class image_viewer:
                 df_filtered = df_filtered[df_filtered['folder_found'] == date]
             if type(date) == list:
                 df_filtered = df_filtered[df_filtered['folder_found'] in date]
-            # df_filtered = df_filtered[df_filtered['day'] == dt.datetime.strptime(date, '%Y-%m-%d').date()]
-            # print('Available observations:')
-            # print(df_filtered.groupby(['object', 'filter']).size())
 
         if filter != None:
             df_filtered = df_filtered[df_filtered['filter'] == filter]
@@ -244,11 +240,11 @@ class image_viewer:
             list - list of strings with header keyword \n
             'all' - will print the whole header
         """
-        image_str, image_int = self.return_index(image)
+        image_str, image_int = self.return_index(image) # type: ignore
         
         # Extracting data from header
-        with fits.open(os.path.join(self.dir_img, image_str)) as hdul:
-            heads = hdul[0].header
+        with fits.open(os.path.join(self.dir_img, image_str)) as hdul: # type: ignore
+            heads = hdul[0].header # type: ignore
             hdul.close()
         # printing basic header info
         print('Image: %s'%image_str)
@@ -292,7 +288,8 @@ class image_viewer:
                         },
                     RGB_norm_kw = {
                         'vmax' : None,
-                        'max_percentile' : 99
+                        'max_percentile' : 99,
+                        'max_sky' : False
                         }
                     ):
         """
@@ -317,9 +314,6 @@ class image_viewer:
             n_image = 1
             colors = ['R', 'G', 'B']
             cutout_RGB = []
-            if manipulation_kw['stretch']!='linear':
-                print('Overriding for a linear stretch')
-                manipulation_kw['stretch']='linear'
             print('------\nRGB color composite image:')
             if n_image == 1: nrows_ncols = (1,1)
             image_list = image
@@ -331,65 +325,44 @@ class image_viewer:
         if type(manipulation_kw) == dict: manipulation_kw = [manipulation_kw]*n_data
         if type(plotting_kw) == dict: plotting_kw = [plotting_kw]*n_data
 
-        fig, axes = plt.subplots(self.nr_nc[0], self.nr_nc[1],
-                                 figsize = figsize)#, layout = 'constrained')
+        fig, axes = plt.subplots(self.nr_nc[0], self.nr_nc[1], # type: ignore
+                                 figsize = figsize)
         if n_image == 1: axes = [axes]
         axes = np.array(axes).reshape(-1)
         
         for i, (img, m_k, p_k) in enumerate(zip(image_list, manipulation_kw, plotting_kw)):
-            self.img_str, self.img_int = self.return_index(img)
-            cutout, norm = self.data_manipulation(self.img_str, **m_k)
+            self.img_str, self.img_int = self.return_index(img) # type: ignore
+            cutout, norm = self.data_manipulation(self.img_str, **m_k) # type: ignore
 
             if RGB == False:
-                print('    Object: ',self.df_files.object.iloc[self.img_int],
-                      '  -  Filter: ',self.df_files['filter'].iloc[self.img_int])
+                print('    Object: ',self.df_files.object.loc[self.img_int],
+                      '  -  Filter: ',self.df_files['filter'].loc[self.img_int])
                 self.plotting(cutout, norm, fig, axes[i], i,
                               **p_k)
             else:
                 # Extracting data from header
-                with fits.open(os.path.join(self.dir_img, self.img_str)) as hdul:
-                    heads = hdul[0].header
+                with fits.open(os.path.join(self.dir_img, self.img_str)) as hdul: # type: ignore
+                    heads = hdul[0].header # type: ignore
                     hdul.close()
-                if i==0: print('    Object: ', self.df_files.iloc[self.img_int].object)
-                print('    - ',colors[i],': ', self.df_files['filter'].iloc[self.img_int])
-                vmin, vmax = heads['FLUXSKY'], None
-                norm_RGB = simple_norm(cutout.data, stretch = 'linear', 
-                                       vmin = vmin, max_percent = RGB_norm_kw['max_percentile'],
-                                       vmax = RGB_norm_kw['vmax'],
-                                       clip = True)
-                cutout_RGB.append(norm_RGB(cutout.data))
-                # print(colors[i], ' data:')
-                # print(vmin, type(vmin))
-                # print('  - Original sky flux', heads['FLUXSKY'])
-                # print('- Original min and max values: ', np.min(cutout.data), np.max(cutout.data))
-                # print('- After normalization: ', np.min(cutout_RGB[i]), np.max(cutout_RGB[i]))
-                if i == len(image_list)-1:
-                    # for k in range(3):
-                        
+                if i==0: print('    Object: ', self.df_files.loc[self.img_int].object)
+                print('    - ',colors[i],': ', self.df_files['filter'].loc[self.img_int])
+                # min and max for manual norm, if max_sky is set, use it to obtain max as max_sky * sky_flux
+                vmin = heads['FLUXSKY']
+                if 'vmax' in RGB_norm_kw.keys(): vmax = RGB_norm_kw['vmax']
+                if RGB_norm_kw['max_sky'] != False: vmax = RGB_norm_kw['max_sky']*heads['FLUXSKY']
+                if vmax == None: vmax = np.max(cutout.data)
+                # manual normalization
+                data = (cutout.data - vmin)/(vmax-vmin)
+                data_mask = data < 1e-3
+                data[data_mask] = 1e-3
+                cutout_RGB.append(data)
+
+                if i == len(image_list)-1:                        
                     rgb_default = make_lupton_rgb(cutout_RGB[0].data, cutout_RGB[1].data, cutout_RGB[2].data,
                                                   **RGB_kw)
-                    self.plotting(cutout, norm_RGB, fig, axes[0],0,
-                                  RGB = True, rgb_data = rgb_default)
-
-                    # axes[0].remove()
-                    # POSSIBLE IMPROVEMENT: USE EACH IMAGE'S WCS TO ALIGN PIXELS
-                    # ax = fig.add_subplot(1,3, 1, projection = cutout.wcs)
-                    # ax.imshow(rgb_default, origin='lower')
-                    # ax.set_title('Lupton RGB')
-                    # ax = fig.add_subplot(1,3, 2, projection = cutout.wcs)
-                    # ax.imshow(cutout_RGB[-1].data, origin = 'lower')
-                    # ax.set_title('R filter normalized data')
-                    # ax = fig.add_subplot(1,3, 3, projection = cutout.wcs)
-                    # ax.imshow(cutout.data, origin = 'lower')
-                    # ax.set_title('Non normalized data')
-       
-        # if RGB:
-        #     print('    Object: ', self.df_files.iloc[self.img_int].object)
-        #     for i, (img, m_k, p_k) in enumerate(zip(image_list, manipulation_kw, plotting_kw)):
-        #         print('    - ',colors[i],': ', self.df_files['filter'].iloc[self.img_int])
-        #         self.img_str, self.img_int = self.return_index(img)
-
-        #     fig, ax = plt.subplots(subplot_kw={'projection': wcs})
+                    self.plotting(cutout, norm, fig, axes[0],0,
+                                  RGB = True, rgb_data = rgb_default,
+                                  **plotting_kw[i])
         plt.tight_layout()
         plt.show()
 
@@ -433,8 +406,8 @@ class image_viewer:
 
         # Extracting data from header
         with fits.open(os.path.join(self.dir_img, image_str)) as hdul:
-            data = hdul[0].data.astype(np.float32)
-            heads = hdul[0].header
+            data = hdul[0].data.astype(np.float32) # type: ignore
+            heads = hdul[0].header # type: ignore
             wcs = WCS(heads)
             hdul.close()
         
@@ -552,29 +525,11 @@ class image_viewer:
             tuple (int, int) - creates figure with specified conditions. Returns (fig, ax) \n
             tuple (ax, int, int) - plots image in specified ax[int,int]
         """
-        # # WCS projection (for simple figures)
-        # if figure['is_simple'] == True:
-        #     fig, ax = plt.subplots(subplot_kw=dict(projection=cutout.wcs), **fig_kwrds)
-        # # Figure creation if multiple figures are in use
-        # if figure['is_simple'] == False:
-        #     create_fig = figure['create_fig']
-        #     nrows_ncols = figure['nrows_ncols']
-        #     im_i = figure['im_i']
-        # if create_fig == True:
-        #     figsize = figure['figsize']
-        #     fig, axes = plt.subplots(nrows_ncols[0], nrows_ncols[1],
-        #                             #  projection = None,
-        #                                 figsize = figsize)
-        #     axes = np.array(axes).reshape(-1)
-        #     ax = axes[0]
-        # else:
-        #     fig = figure['fig']
-        #     ax = figure['ax']
-        with fits.open(os.path.join(self.dir_img, self.img_str)) as hdul:
-            heads = hdul[0].header
+        with fits.open(os.path.join(self.dir_img, self.img_str)) as hdul: # type: ignore
+            heads = hdul[0].header # type: ignore
             hdul.close()
         ax.remove()
-        ax = fig.add_subplot(self.nr_nc[0], self.nr_nc[1], ax_i+1, projection = cutout.wcs)
+        ax = fig.add_subplot(self.nr_nc[0], self.nr_nc[1], ax_i+1, projection = cutout.wcs) # type: ignore
         if RGB == False:
         # colorbar
             cax = ax.imshow(cutout.data,
@@ -587,7 +542,7 @@ class image_viewer:
             ax.imshow(rgb_data, origin = 'lower')
 
         # Scale bar choosing color depending on luminance of cmap
-        scalebar_angle = scalebar_arcsec/3600*u.deg
+        scalebar_angle = scalebar_arcsec/3600*u.deg # type: ignore
         rgba = plt.get_cmap(cmap)(0.0)
         luminance = 0.299*rgba[0] + 0.587*rgba[1] + 0.114*rgba[2]
         scalebar_color = 'white' if (luminance < 0.5 and scalebar_frame == False) else 'black'
@@ -628,13 +583,13 @@ class image_viewer:
 
     def read_data(self, image, header = False):
         """Method to view images."""
-        image_str, image_int = self.return_index(image)
+        image_str, image_int = self.return_index(image) # type: ignore
         print('Reading ', image_str)
 
         # Extracting data from header
-        with fits.open(os.path.join(self.dir_img, image_str)) as hdul:
-            data = hdul[0].data.astype(np.float32)
-            head = hdul[0].header
+        with fits.open(os.path.join(self.dir_img, image_str)) as hdul: # type: ignore
+            data = hdul[0].data.astype(np.float32) # type: ignore
+            head = hdul[0].header # type: ignore
             hdul.close()
 
         if header == False: return data
@@ -652,22 +607,18 @@ class image_viewer:
         Returns:
             astropy.Angle object with angular separation"""
 
-        image_str, image_int = self.return_index(image)
-        with fits.open(os.path.join(self.dir_img, image_str)) as hdul:
-            heads = hdul[0].header
+        image_str, image_int = self.return_index(image) # type: ignore
+        with fits.open(os.path.join(self.dir_img, image_str)) as hdul: # type: ignore
+            heads = hdul[0].header # type: ignore
             hdul.close()
         RA = str(heads['RA']) + ' d'
         DEC = str(heads['DEC']) + ' d'
         time = Time(self.df_files.iloc[image_int]['date_time'])
         loc = EarthLocation.of_site('Observatorio del Teide')
         moon_coords = get_body('moon', time = time, location = loc)
-        moon_coords = SkyCoord(ra = moon_coords.ra, dec = moon_coords.dec, frame = 'icrs', unit = u.deg)
-        obj_coords = SkyCoord(ra = Angle(RA), dec = Angle(DEC), frame = 'icrs', unit = u.deg)
+        moon_coords = SkyCoord(ra = moon_coords.ra, dec = moon_coords.dec, frame = 'icrs', unit = u.deg) # type: ignore
+        obj_coords = SkyCoord(ra = Angle(RA), dec = Angle(DEC), frame = 'icrs', unit = u.deg) # type: ignore
         sep = obj_coords.separation(moon_coords)
-        # print('angle %.1fº'%sep.deg)
         return sep
-        # print('Time of observation: %s'%time)
-        # print('Object coordinates: \n - RA: %s\n - DEC: %s' %(obj_coords.ra, obj_coords.dec))
-        # print('Moon coordinates: \n - RA: %s\n - DEC: %s' %(moon_coords.ra, moon_coords.dec))
-        # print('Angular separation to Moon: ', sep)
+
 
