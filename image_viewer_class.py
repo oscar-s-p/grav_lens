@@ -87,7 +87,13 @@ class image_viewer:
                                     {'UVIS' : 
                                         {'SCALE' : 0.04},
                                     'IR' : 
-                                        {'SCALE' : 0.13}}}
+                                        {'SCALE' : 0.13}}},
+                            'Keck II':
+                                {'data_i' : 0,
+                                 'header_i' : 0,
+                                 'header_WCS' : 0,
+                                 'detector' : 
+                                    {'Aladdin 3'}}
                                 }
         
         self.folder_list = folder_list
@@ -128,8 +134,9 @@ class image_viewer:
                             heads = hdul[0].header # type: ignore
                             hdul.close()
                         telescope, camera, date_time, object, filter = heads['TELESCOP'], heads['INSTRUME'], heads['DATE-OBS']+' '+heads['TIME-OBS'], heads['TARGNAME'], heads['FILTER']
-                        date_time = pd.to_datetime(date_time, format='%Y-%m-%d %H:%M:%S') # type: ignore
-                        im_type = 'HST'
+                        try: date_time = pd.to_datetime(date_time, format='%Y-%m-%d %H:%M:%S') # type: ignore
+                        except: date_time = pd.to_datetime(date_time, format='%Y-%m-%d %H:%M:%S.%f') # type: ignore
+                        im_type = telescope
                     # except:
                         # print('TTT and HST file format error...')
                         # telescope, camera, date_time, object, filter = None, None, None, None, None
@@ -398,6 +405,8 @@ class image_viewer:
                 print('Choosing first match for RGB plot.')
         
             img_str = self.df_files['path'].loc[filt_i[0]]
+            self.img_str = img_str
+            self.img_int = self.df_files.index[self.df_files['filename']==img_str].to_list()[0]
             # obtain headers for skyflux and data for title
             with fits.open(os.path.join(self.dir_img, img_str)) as hdul: # type: ignore
                 headers.append(hdul[0].header) # type: ignore
@@ -601,11 +610,24 @@ class image_viewer:
         
 
         # Extracting data from header
+        print('wcs')
         with fits.open(os.path.join(self.dir_img, image_str)) as hdul:
             print(image_str)
             data = hdul[self.im_type_dir[self.df_files.im_type.loc[self.img_int]]['data_i']].data.astype(np.float32) # type: ignore
             heads = hdul[0].header # type: ignore
             heads_WCS = hdul[self.im_type_dir[self.df_files.im_type.loc[self.img_int]]['header_WCS']].header  # type: ignore
+            if self.df_files.im_type.loc[self.img_int] == 'Keck II':
+                hdr = hdul[0].header # type : ignore
+                # Fix CD matrix elements: convert strings to floats
+                for key in ['CD1_1', 'CD1_2', 'CD2_1', 'CD2_2']:
+                    if key in hdr:
+                        hdr[key] = float(hdr[key])
+                # Replace deprecated RADECSYS by RADESYSa
+                if 'RADECSYS' in hdr:
+                    hdr['RADESYSa'] = hdr['RADECSYS'].strip()
+                    del hdr['RADECSYS']
+                heads_WCS = hdr
+
             wcs = WCS(heads_WCS)
             hdul.close()
         
@@ -630,8 +652,13 @@ class image_viewer:
             size = (x_shape, y_shape)
         if self.df_files.im_type.loc[self.img_int] == 'LB':
             scale = float(heads['SCALE'])
-        else:
+        elif self.df_files.im_type.loc[self.img_int] == 'HST':
             scale = float(self.im_type_dir[self.df_files.im_type.loc[self.img_int]]['detector'][heads['DETECTOR']]['SCALE'])
+        elif self.df_files.im_type.loc[self.img_int] == 'Keck II':
+            scale = float(heads['PIXSCALE'])
+        else:
+            print('No pixel scale defined, check image type.')
+            return
         if type(zoom) == str:
             zoom = Angle(zoom)
             size = (zoom.deg / scale * 3600, zoom.deg / scale * 3600)
@@ -644,6 +671,7 @@ class image_viewer:
             size = size[::-1]
 
         # slicing image
+        print('cutout')
         try:
             cutout = Cutout2D(data, position = center_px, size = size, #zoom,
                               wcs = wcs, mode = 'partial')
@@ -793,6 +821,16 @@ class image_viewer:
                         heads['EXPTIME'],
                         self.df_files.iloc[self.img_int]['date_time'].strftime("%Y-%m-%d %H:%M"),
                         heads['MOONANGL'], heads['SUNANGLE']))
+        if title_str == False and self.df_files.im_type.loc[self.img_int]=='Keck II':
+            title_str = (r'$\bf{Object}$: %s - $\bf{Telescope}$: %s''\n'
+                        r'$\bf{Camera}$: %s - $\bf{Filter}$: %s - $\bf{Integration}$: %s s''\n'
+                        r'$\bf{Date time}$: %s'
+                        %(self.df_files.iloc[self.img_int]['object'],
+                        self.df_files.iloc[self.img_int]['telescope'],
+                        self.df_files.iloc[self.img_int]['camera'],
+                        self.df_files.iloc[self.img_int]['filter'],
+                        heads['EXPOSURE'],
+                        self.df_files.iloc[self.img_int]['date_time'].strftime("%Y-%m-%d %H:%M")))
         ax.set_title(title_str)
         ax.minorticks_on()
 
