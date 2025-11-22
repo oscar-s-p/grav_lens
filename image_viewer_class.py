@@ -11,7 +11,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredDirectionArrows
-from matplotlib.font_manager import FontProperties
 from math import ceil
 
 from astropy.io import fits
