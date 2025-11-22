@@ -3,6 +3,9 @@
 venv/
 venv.bak/
 
+# Gigalens repo
+gigalens/
+
 # Obsidian notebook
 Libreta
 

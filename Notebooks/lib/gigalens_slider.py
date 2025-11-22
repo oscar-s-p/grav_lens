@@ -16,7 +16,7 @@ import numpy as np
 import optax
 from jax import numpy as jnp
 from matplotlib import pyplot as plt
-import optax
+
 tfd = tfp.distributions
 
 import lenstronomy
@@ -38,6 +38,8 @@ from lenstronomy.Util import util
 from lenstronomy.LensModel.Solver.lens_equation_solver import LensEquationSolver
 from os.path import expanduser
 import sys
+import os
+from pathlib import Path
 
 from matplotlib import gridspec
 
@@ -192,7 +194,9 @@ def image_sim(theta_E, q, phi,lens_z,lra,ldec,source_z, sra,sdec,lens_light, gam
     pixel_scale = kwargs_g_band['pixel_scale']
     numpix = int(round(size / pixel_scale))
     deltaPix = pixel_scale
-
+    # Robust way to get the path relative to this file
+    # base_path = Path(__file__).parent.parent  # adjust as needed
+    # psf_path = base_path / 'gigalens' / 'src' / 'gigalens' / 'assets' / 'psf.npy'
     kernel = np.load('gigalens/src/gigalens/assets/psf.npy').astype(np.float32)
     phys_model = PhysicalModel([epl.EPL(50), shear.Shear()], [sersic.SersicEllipse(use_lstsq=False)], [sersic.SersicEllipse(use_lstsq=False)])
     sim_config = SimulatorConfig(delta_pix=deltaPix, num_pix=numpix, supersample=1, kernel=kernel)
