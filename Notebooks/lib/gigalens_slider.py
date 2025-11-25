@@ -47,17 +47,27 @@ from matplotlib import gridspec
 
 def image_sim(theta_E, q, phi,lens_z,lra,ldec,source_z, sra,sdec,lens_light, gamma, gamma_ext, psi_ext, source_light=True,ps_light=False):
 #     theta_E: Einstein radius
-    
+#     q: axial ratio
+#     phi: position angle
+#     lens_z: lens redshift    
 #     lra: lens right ascension
 #     ldec: lens declination
+#     source_z: source redshift
 #     sra: source right ascension
 #     sdec: source declination
+#     lens_light:
+#     gamma: 
+#     gamma_ext: 
+#     psi_ext:
+#     source_light:
+#     ps_light:
     
     # Convert shear strength and angle to gamma_1 and gamma_2
+    # similar to Eq 5 in paper
     gamma_1 = gamma_ext * np.cos(2 * psi_ext)
     gamma_2 = gamma_ext * np.sin(2 * psi_ext)
     
-    
+    # loading simulation filters
     Roman_g = lenstronomy.SimulationAPI.ObservationConfig.Roman.Roman(band='F062', psf_type='PIXEL', survey_mode='wide_area')
     Roman_r = lenstronomy.SimulationAPI.ObservationConfig.Roman.Roman(band='F106', psf_type='PIXEL', survey_mode='wide_area')
     Roman_i = lenstronomy.SimulationAPI.ObservationConfig.Roman.Roman(band='F184', psf_type='PIXEL', survey_mode='wide_area')
@@ -70,16 +80,17 @@ def image_sim(theta_E, q, phi,lens_z,lra,ldec,source_z, sra,sdec,lens_light, gam
     '''
     
     '''
-    kwargs_model = {'lens_model_list': ['EPL', 'SHEAR'],# list of lens models to be used
+    kwargs_model = {'lens_model_list': ['EPL', 'SHEAR'], # list of lens models to be used
                     'lens_redshift_list': [lens_z, lens_z],
                     'z_source': source_z,
                     'lens_light_model_list': ['SERSIC_ELLIPSE'],  # list of unlensed light models to be used
                     'source_light_model_list': ['SERSIC'],  # list of extended source models to be used, here we used the interpolated real galaxy
-    }
+                    }
+    # to obtain ellipticity from orientation angle and axial ratio
     e1,e2 = param_util.phi_q2_ellipticity(q=q,phi=phi)
     #e1,e2 = e1,e2
     
-
+    # lens model parameters
     kwargs_lens = [
     {'theta_E': theta_E, 'center_x': lra, 'center_y': ldec, 'e1':e1 , 'e2':e2, 'gamma':gamma},
     {'gamma1': gamma_1, 'gamma2': gamma_2}
@@ -91,7 +102,7 @@ def image_sim(theta_E, q, phi,lens_z,lra,ldec,source_z, sra,sdec,lens_light, gam
     kwargs_source_mag_g = [{'magnitude': 28, 'center_x': sra, 'center_y': sdec,'R_sersic': 0.1, 'n_sersic': 2}]
     # point source
     kwargs_ps_mag_g = [{'magnitude': 2, 'ra_source': 0, 'dec_source': 0}]
-
+    # 32**2 * 2 * 2 * 2 (each filter)
     numpix = 1024 * 8  # number of pixels per axis of the image to be modelled
 
     kwargs_numerics = {'point_source_supersampling_factor': 1}
@@ -129,7 +140,7 @@ def image_sim(theta_E, q, phi,lens_z,lra,ldec,source_z, sra,sdec,lens_light, gam
     pixel_scale = kwargs_g_band['pixel_scale']
     numpix = int(round(size / pixel_scale))
 
-
+    # Lenstronomy simulation with model
     sim_b = lenstronomy.SimulationAPI.sim_api.SimAPI(numpix=numpix, kwargs_single_band=kwargs_b_band, kwargs_model=kwargs_model)
     sim_g = lenstronomy.SimulationAPI.sim_api.SimAPI(numpix=numpix, kwargs_single_band=kwargs_g_band, kwargs_model=kwargs_model)
     sim_r = lenstronomy.SimulationAPI.sim_api.SimAPI(numpix=numpix, kwargs_single_band=kwargs_r_band, kwargs_model=kwargs_model)
@@ -370,6 +381,7 @@ ax2 = fig.add_subplot(gs[1])
 ax3 = fig.add_subplot(gs[2])
 plt.subplots_adjust(left=0.25, bottom=0.6)
 
+# Gigalens
 image_display = ax1.imshow(sqrt_rescale(img, scale_min=0, scale_max=0.1), origin='lower', extent=[-5, 5, -5, 5])
 ax1.set_title('Gigalens')
 lens_plot.caustics_plot(ax1, coords, lens_model, kwargs_lens, fast_caustic=True, color_crit='red', color_caustic='green', alpha=0.6)
@@ -380,7 +392,7 @@ mu_init = np.sum(np.abs(lens_model.magnification(*image_positions, kwargs=kwargs
 text_mu = ax1.text(0.05, 0.85, '', transform=ax1.transAxes, color="white", fontsize=5, va='top')
 text_mu.set_text(f"μ: {mu_init:.4f}")
 
-#lenstronomy
+# lenstronomy
 lenstronomy_display = ax2.imshow(lensstron_img, origin='lower', extent=[-5, 5, -5, 5])
 lens_plot.caustics_plot(ax2, coords, lens_model, kwargs_lens, fast_caustic=True, color_crit='red', color_caustic='green', alpha=0.6)
 ax2.plot(sra_init, sdec_init, 'bx')
@@ -389,6 +401,7 @@ ax2.set_title('Lenstronomy')
 positive_mask = np.ma.masked_where(mag <= 0, mag) 
 negative_mask = np.ma.masked_where(mag > 0, mag)
 
+# magnification display
 pos_display = ax3.imshow(
     np.log10(np.abs(positive_mask)),
     origin='lower',
@@ -397,7 +410,6 @@ pos_display = ax3.imshow(
     vmin=-3.0,
     vmax= 3.0
 )
-
 neg_display = ax3.imshow(
     np.log10(np.abs(negative_mask)), 
     origin='lower',
@@ -419,7 +431,15 @@ ax3.set_title('Log of Magnification')
 fig.colorbar(pos_display, ax=ax3, label='Log |Mag| (+ = red, - = blue)')
 fig.colorbar(neg_display, ax=ax3)
 
-
+# problem solution
+ax1.set_xlim(-5,5)
+ax1.set_ylim(-5,5)
+ax2.set_xlim(-5,5)
+ax2.set_ylim(-5,5)
+ax1.set_xlabel('RA [arcsec]')
+ax2.set_xlabel('RA [arcsec]')
+ax3.set_xlabel('RA [arcsec]')
+ax1.set_ylabel('DEC [arcsec]')
 
 # slider setup
 ax_theta_E = plt.axes([0.25, 0.4, 0.65, 0.03])
@@ -478,6 +498,8 @@ def update(val):
     ax1.clear()
     ax2.clear()
     ax3.clear()
+    # gpt ideas
+    # image_display = ax1.imshow(sqrt_rescale(new_img, scale_min=0, scale_max=0.1), origin='lower', extent=[-5, 5, -5, 5])
     image_display.set_data(new_img)
     ax1.imshow(sqrt_rescale(new_img, scale_min=0, scale_max=0.1), aspect='equal', origin='lower', extent=[-5, 5, -5, 5])
     ax1.set_title('Gigalens')
@@ -486,7 +508,7 @@ def update(val):
     ax2.imshow(lensstron_img_new, origin='lower', extent=[-5, 5, -5, 5])
     lens_plot.caustics_plot(ax1, new_coords, new_lens_model, new_kwargs_lens, fast_caustic=True, color_crit='red', color_caustic='green', alpha=0.6)
     lens_plot.caustics_plot(ax2, new_coords, new_lens_model, new_kwargs_lens, fast_caustic=True, color_crit='red', color_caustic='green', alpha=0.6)
-
+    
     pos_display.set_data(new_mag)
     #ax2.imshow(new_mag, origin='lower', extent=[-5, 5, -5, 5], cmap='bwr')
     positive_mask = np.ma.masked_where(new_mag <= 0, new_mag)
@@ -511,6 +533,16 @@ def update(val):
     )
     ax1.plot(sra, sdec, 'bx')
     ax2.plot(sra, sdec, 'bx')
+
+    # problem solution
+    ax1.set_xlim(-5,5)
+    ax1.set_ylim(-5,5)
+    ax2.set_xlim(-5,5)
+    ax2.set_ylim(-5,5)
+    ax1.set_xlabel('RA [arcsec]')
+    ax2.set_xlabel('RA [arcsec]')
+    ax3.set_xlabel('RA [arcsec]')
+    ax1.set_ylabel('DEC [arcsec]')
 
     new_solver = LensEquationSolver(new_lens_model)
     image_positions_new = new_solver.image_position_from_source(sra, sdec, new_kwargs_lens)
