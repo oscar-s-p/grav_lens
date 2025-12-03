@@ -11,6 +11,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredDirectionArrows
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from math import ceil
 
 from astropy.io import fits
@@ -777,10 +778,12 @@ class image_viewer:
         ax = fig.add_subplot(self.nr_nc[0], self.nr_nc[1], ax_i+1, projection = wcs) # type: ignore
         if RGB == False:
         # colorbar
-            cax = ax.imshow(cutout.data,
+            im = ax.imshow(cutout.data,
                             norm = norm, origin = 'lower',
                             cmap = cmap)
-            cbar = plt.colorbar(cax)
+            divider = make_axes_locatable(ax) # ensure colorbar height equal to inner axis of plot
+            cax = divider.append_axes("right", size = "5%", pad = 0.01)
+            cbar = plt.colorbar(im, cax = cax)
             cbar.set_label('ADU', rotation=270, labelpad=15)
             cbar.ax.tick_params(labelsize=10)
         else:
