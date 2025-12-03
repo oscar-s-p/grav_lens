@@ -782,10 +782,17 @@ class image_viewer:
                             norm = norm, origin = 'lower',
                             cmap = cmap)
             divider = make_axes_locatable(ax) # ensure colorbar height equal to inner axis of plot
-            cax = divider.append_axes("right", size = "5%", pad = 0.01)
-            cbar = plt.colorbar(im, cax = cax)
-            cbar.set_label('ADU', rotation=270, labelpad=15)
-            cbar.ax.tick_params(labelsize=10)
+            cax = divider.append_axes("right", size = "5%", pad = "2%")
+            cbar = fig.colorbar(im, cax = cax)
+            cbar.ax.xaxis.set_ticks_position('none')
+            cbar.ax.yaxis.set_label_position('right')
+            cbar.ax.yaxis.tick_right()
+            print('pppp')
+            # cax.set_ylabel('ADU', rotation=270)#, labelpad=-10)
+            # cax.ax.tick_params(labelsize=10)
+            # cax.yaxis.set_label_position('right')
+            # cax.yaxis.set_ticks_position("right")
+            # cax.xaxis.set_ticks_position("none")
         else:
             ax.imshow(rgb_data, origin = 'lower')
 
