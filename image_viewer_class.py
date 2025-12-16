@@ -140,11 +140,14 @@ class image_viewer:
                     # except:
                         # print('TTT and HST file format error...')
                         # telescope, camera, date_time, object, filter = None, None, None, None, None
+                date = date_time.date()
+                if date_time.hour < 12 : date = date + dt.timedelta(days=-1)
+                date = str(date)
                 size_MB = f.stat().st_size / 1e6
                 created = pd.to_datetime(f.stat().st_ctime, unit="s")
                 files_data.append({"filename": name, "path": path, "telescope": telescope, 'camera': camera,
                                    "object": object, "filter": filter, "size_MB": size_MB,
-                                   "date_time": date_time,
+                                   "date_time": date_time, "date": date,
                                    "folder_found": folder_found[k],
                                    "im_type" : im_type})
             except: 
@@ -252,10 +255,16 @@ class image_viewer:
         """
         try:
             if type(object) == str:
-                obj_int = self.df_grav_lens.index[self.df_grav_lens['object'] == object].tolist()
-                if obj_int == []:
-                    print('ERROR: OBJECT NAME NOT REGISTERED.\n  Try with one of: ', self.df_grav_lens['object'].tolist())
-                obj_str = object
+                if object in self.df_grav_lens['object']:
+                    obj_int = self.df_grav_lens.index[self.df_grav_lens['object'] == object].tolist()
+                    obj_str = object
+                elif object in self.df_files['object'].unique(): 
+                    obj_str = object
+                else:
+                    print('ERROR: OBJECT NAME NOT REGISTERED.\n  Try with one of: ', self.df_grav_lens['object'].tolist(), ' in the saved gravitational lens objects.')
+                    print('Or see the objects found in the folder:')
+                    print(self.df_files['object'].unique())
+                    return
             elif type(object) in [int, np.int16, np.int32, np.int64, np.int8]:
                 obj_str = self.df_grav_lens['object'].iloc[object]
                 obj_int = object  
@@ -267,16 +276,19 @@ class image_viewer:
 
         if date == None:
             print('Available date observations:')
-            print(df_filtered.groupby(['object', 'folder_found']).size())
+            print(df_filtered.groupby(['object', 'date']).size())
         
-        if date != None:
+        else: 
             if type(date) == str:
-                df_filtered = df_filtered[df_filtered['folder_found'] == date]
+                df_filtered = df_filtered[df_filtered['date'] == date]
             if type(date) == list:
-                df_filtered = df_filtered[df_filtered['folder_found'] in date]
+                df_filtered = df_filtered[df_filtered['date'] in date]
 
         if filter != None:
             df_filtered = df_filtered[df_filtered['filter'] == self.dict_filters[filter]]
+        
+        if printeo:
+            print(df_filtered[['object', 'filter', 'date_time']])
         
         if return_df == True:
             print('Matching index: ')
@@ -378,10 +390,14 @@ class image_viewer:
                     if object not in self.df_files['object']: print('ERROR: Object not known')
                     else: print('ERROR: Object observed, coordinates are required')
                     return
+                else:
+                    new_object = {'object' : object, 'ra' : Angle(object_coordinates[0]), 'dec' : Angle(object_coordinates[1])}
+                    self.df_grav_lens.loc[len(self.df_grav_lens)] = new_object
+                    obj_int = self.df_grav_lens.index[self.df_grav_lens['object'] == object][0]
         else: obj_int = object
         if object_coordinates == None:
             obj_coords = (self.df_grav_lens['ra'].loc[obj_int],
-                        self.df_grav_lens['dec'].loc[obj_int])
+                          self.df_grav_lens['dec'].loc[obj_int])
         else: obj_coords = object_coordinates
 
         print('RGB image of object: ', self.df_grav_lens.loc[obj_int].object, ' taken the night of ', date)
@@ -406,7 +422,7 @@ class image_viewer:
         
             img_str = self.df_files['path'].loc[filt_i[0]]
             self.img_str = img_str
-            self.img_int = self.df_files.index[self.df_files['filename']==img_str].to_list()[0]
+            self.img_int = self.df_files.index[self.df_files['path']==img_str].to_list()[0]
             # obtain headers for skyflux and data for title
             with fits.open(os.path.join(self.dir_img, img_str)) as hdul: # type: ignore
                 headers.append(hdul[0].header) # type: ignore
@@ -477,7 +493,8 @@ class image_viewer:
                        'zoom' : False,
                        'stretch' : 'linear',
                        'percentile' : None,
-                       'vminmax' : (None, None)
+                       'vminmax' : (None, None),
+                       'rotate': True
                        },
                     plotting_kw = {
                         'cmap' : 'gray',
@@ -526,7 +543,9 @@ class image_viewer:
         n_data = len(image_list)
 
         # if manipulation and plotting are dicts, use the same setup for all images
-        if type(manipulation_kw) == dict: manipulation_kw = [manipulation_kw]*n_data
+        if type(manipulation_kw) == dict:
+            if manipulation_kw['rotate'] == False: plotting_kw['arrows'] = False
+            manipulation_kw = [manipulation_kw]*n_data
         if type(plotting_kw) == dict: plotting_kw = [plotting_kw]*n_data
 
         fig, axes = plt.subplots(self.nr_nc[0], self.nr_nc[1], # type: ignore
@@ -610,7 +629,6 @@ class image_viewer:
         
 
         # Extracting data from header
-        print('wcs')
         with fits.open(os.path.join(self.dir_img, image_str)) as hdul:
             print(image_str)
             data = hdul[self.im_type_dir[self.df_files.im_type.loc[self.img_int]]['data_i']].data.astype(np.float32) # type: ignore
@@ -625,7 +643,7 @@ class image_viewer:
                 # Replace deprecated RADECSYS by RADESYSa
                 if 'RADECSYS' in hdr:
                     hdr['RADESYSa'] = hdr['RADECSYS'].strip()
-                    del hdr['RADECSYS']
+                    hdr['RADECSYS']
                 heads_WCS = hdr
 
             wcs = WCS(heads_WCS)
@@ -671,7 +689,6 @@ class image_viewer:
             size = size[::-1]
 
         # slicing image
-        print('cutout')
         try:
             cutout = Cutout2D(data, position = center_px, size = size, #zoom,
                               wcs = wcs, mode = 'partial')
@@ -782,17 +799,42 @@ class image_viewer:
                             norm = norm, origin = 'lower',
                             cmap = cmap)
             divider = make_axes_locatable(ax) # ensure colorbar height equal to inner axis of plot
-            cax = divider.append_axes("right", size = "5%", pad = "2%")
+            cax = divider.append_axes("right", size = "5%", pad = "7%")
             cbar = fig.colorbar(im, cax = cax)
-            cbar.ax.xaxis.set_ticks_position('none')
-            cbar.ax.yaxis.set_label_position('right')
-            cbar.ax.yaxis.tick_right()
-            print('pppp')
-            # cax.set_ylabel('ADU', rotation=270)#, labelpad=-10)
-            # cax.ax.tick_params(labelsize=10)
-            # cax.yaxis.set_label_position('right')
-            # cax.yaxis.set_ticks_position("right")
-            # cax.xaxis.set_ticks_position("none")
+            # hide the entire x-axis (ticks, ticklabels, spine)
+            cbar.ax.tick_params(axis='x', which='both', 
+                    labelbottom=False, labeltop=False,
+                    bottom=False, top=False, length=0)
+            # ticks on the right
+            # cbar.ax.set_ylabel('ADU')
+
+            cbar.ax.tick_params(axis='y', which='both', 
+                    labelright=True, labelleft=False,
+                    right=True, left=False, length=3,
+                    labelsize = 10)
+            # cbar.ax.set_ylabel('ADU', loc = 'lower', labelpad=-5.2)#,  **{'rotation':90})
+
+            cbar.ax.yaxis.set_ticks_position('right')
+            cbar.ax.yaxis.set_label_position('left')
+
+            # 4) create the label (use cbar.set_label so colorbar internals are consistent)
+            cbar.set_label("ADU")   # do not pass rotation here
+
+            # 5) now get the Text object and force rotation + coords
+            lbl = cbar.ax.yaxis.get_label()   # returns the Text instance
+            lbl.set_rotation(90)               # rotate text (90 or 270 as you like)
+            lbl.set_va('center')
+            lbl.set_ha('center')
+
+            # move the label into the gap between image and colorbar
+            # x < 0 moves left; y=0.5 centers vertically
+            cbar.ax.yaxis.set_label_coords(-0.45, 0.5)  # tune -0.45 to taste
+
+            # 6) If you use tight_layout or constrained_layout, run these BEFORE step 5,
+            #    or run a final draw after everything so the Text object is not overwritten:
+            fig.canvas.draw()  
+
+
         else:
             ax.imshow(rgb_data, origin = 'lower')
 
