@@ -155,9 +155,10 @@ class image_viewer:
                 
         if len(files)==0:
             print('WARNING: NO IMAGE FILES FOUND')
-            return
+            #return
         # creation of dataframe
-        df_files = pd.DataFrame(files_data).sort_values("filename").reset_index(drop=True)
+        if len(files)!=0:
+            df_files = pd.DataFrame(files_data).sort_values("filename").reset_index(drop=True)
         # Addition of previous dataframe
         if type(previous_df) != bool:
             if type(previous_df) != pd.DataFrame:
@@ -167,7 +168,9 @@ class image_viewer:
                     else: 
                         print('ERROR: unrecognized DataFrame format. Use \'.pkl\' or \'.csv\'.')
                         return
-            self.df_files = pd.concat([df_files, previous_df], ignore_index = True).drop_duplicates(subset = 'filename', keep= 'last')
+            if len(files)!=0:
+                self.df_files = pd.concat([df_files, previous_df], ignore_index = True).drop_duplicates(subset = 'filename', keep= 'last')
+            else: self.df_files = previous_df
         else: self.df_files = df_files
         # print available images if requested
         if list_available:
