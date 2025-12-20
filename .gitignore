@@ -12,6 +12,9 @@ Libreta
 # FITS images
 *.fits
 
+# numpy arrays
+*.npy
+
 # Pandas dataframes
 *.pkl
 
